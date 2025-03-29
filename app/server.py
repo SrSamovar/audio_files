@@ -1,6 +1,9 @@
 from datetime import timedelta
 from typing import Annotated
 import requests
+from pyasn1.codec.ber.encoder import tagMap
+from sqlalchemy import select
+
 from app.models import AudioFile
 from crud import add_item, get_user
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Form
@@ -22,13 +25,13 @@ app = FastAPI(
 
 
 
-@app.get("/auth/yandex")
+@app.get("/auth/yandex", tags=['Yandex Register'])
 async def auth_yandex():
     redirect_uri = f"{YANDEX_OAUTH_URL}?response_type=code&client_id={YANDEX_CLIENT_ID}&redirect_uri={YANDEX_REDIRECT_URI}"
     return RedirectResponse(url=redirect_uri)
 
 
-@app.get("/auth/yandex/callback")
+@app.get("/auth/yandex/callback", tags=['Yandex Register'])
 async def auth_yandex_callback(code: str, session: SessionDependency):
     # Получение токена
     token_response = requests.post(YANDEX_TOKEN_URL, data={
@@ -75,7 +78,7 @@ async def auth_yandex_callback(code: str, session: SessionDependency):
     return {"access_token": jwt_token, "token_type": "bearer"}
 
 
-@app.post("/upload-audio")
+@app.post("/upload-audio", tags=['Audiofiles'])
 async def upload_audio(
         session: SessionDependency,
         file: Annotated[UploadFile, File()],
@@ -109,7 +112,7 @@ async def upload_audio(
 
     return {"info": f"File '{filename}' uploaded successfully"}
 
-@app.patch("/api/v1/user/{user_id}", response_model=UserUpdateResponse)
+@app.patch("/api/v1/user/{user_id}", response_model=UserUpdateResponse, tags=['User'])
 async def update_user(session: SessionDependency, user_id: int,
                       user_data: Annotated[UserUpdateRequest, Form()], request: Request):
     user = await get_user(request, user_id, session)
@@ -124,7 +127,7 @@ async def update_user(session: SessionDependency, user_id: int,
 
     return user.id_dict
 
-@app.delete("/api/v1/user/{user_id}")
+@app.delete("/api/v1/user/{user_id}", tags=['User'])
 async def delete_user(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
     user = await get_user(request, user_id, session)
 
@@ -136,12 +139,13 @@ async def delete_user(session: SessionDependency, user_id: Annotated[int, Form()
     return {"detail": "User deleted successfully"}
 
 
-@app.get('/api/v1/user/{user_id}', response_model=GetUserResponse)
+@app.get('/api/v1/user/{user_id}', response_model=GetUserResponse, tags=['User'])
 async def read_user(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
     user = await get_user(request, user_id, session)
     return user.dict_
 
-@app.get('/api/v1/user/{user_id}/audio-files', response_model=list[GetAudioFileResponse])
+@app.get('/api/v1/user/{user_id}/audio-files',
+         response_model=list[GetAudioFileResponse], tags=['Audiofiles'])
 async def list_audio_files(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
     user = await get_user(request, user_id, session)
 
