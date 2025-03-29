@@ -1,4 +1,3 @@
-import datetime
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncAttrs
 from sqlalchemy import Integer, String, Boolean, DateTime, func, UUID, ForeignKey, CheckConstraint
@@ -33,6 +32,7 @@ class User(Base):
     yandex_id: Mapped[str] = mapped_column(String, unique=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     audios: Mapped[list['AudioFile']] = relationship('AudioFile', lazy='joined', back_populates='user')
 
     @property
@@ -51,6 +51,10 @@ class AudioFile(Base):
     filename: Mapped[str] = mapped_column(String, unique=True)
     file_path: Mapped[str] = mapped_column(String)
     user: Mapped[User] = relationship(User, lazy='joined', back_populates='audios')
+
+
+ORM_OBJ = User | AudioFile
+ORM_CLS = type[User] | type[AudioFile]
 
 async def init_orm():
     async with engine.begin() as conn:

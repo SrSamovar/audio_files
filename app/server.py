@@ -1,10 +1,13 @@
 from datetime import timedelta
 from typing import Annotated
-
 import requests
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from app.models import AudioFile
+from crud import add_item, get_user
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Form
 from fastapi.responses import RedirectResponse
-from auth import verify_token, create_access_token
+from schema import UserUpdateRequest, UserUpdateResponse, GetUserResponse, GetAudioFileResponse
+from auth import verify_token, create_access_token, YANDEX_OAUTH_URL, YANDEX_CLIENT_ID, YANDEX_REDIRECT_URI, \
+    YANDEX_TOKEN_URL, YANDEX_CLIENT_SECRET, ACCESS_TOKEN_EXPIRE_MINUTES
 from lifespan import lifespan
 from dependency import SessionDependency
 from models import User
@@ -14,18 +17,10 @@ app = FastAPI(
     title="Audio storage API",
     description="API for managing audio files",
     version="1.0.0",
-    lifespan=lifespan()
+    lifespan=lifespan
 )
 
-# Конфигурация
-SECRET_KEY = os.getenv('SECRET_KEY')
-ALGORITHM = os.getenv('ALGORITHM')
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-YANDEX_CLIENT_ID = os.getenv('YANDEX_CLIENT_ID')
-YANDEX_CLIENT_SECRET = os.getenv('YANDEX_CLIENT_SECRET')
-YANDEX_REDIRECT_URI = "http://localhost:8000/auth/yandex/callback"
-YANDEX_OAUTH_URL = "https://oauth.yandex.ru/authorize"
-YANDEX_TOKEN_URL = "https://oauth.yandex.ru/token"
+
 
 @app.get("/auth/yandex")
 async def auth_yandex():
@@ -80,11 +75,11 @@ async def auth_yandex_callback(code: str, session: SessionDependency):
     return {"access_token": jwt_token, "token_type": "bearer"}
 
 
-@app.post("/upload-audio/")
+@app.post("/upload-audio")
 async def upload_audio(
         session: SessionDependency,
         file: Annotated[UploadFile, File()],
-        filename: str = None
+        filename: Annotated[str, Form()] = None
 ):
     token = file.headers.get("Authorization")
     if not token or not token.startswith("Bearer "):
@@ -114,3 +109,45 @@ async def upload_audio(
 
     return {"info": f"File '{filename}' uploaded successfully"}
 
+@app.patch("/api/v1/user/{user_id}", response_model=UserUpdateResponse)
+async def update_user(session: SessionDependency, user_id: int,
+                      user_data: Annotated[UserUpdateRequest, Form()], request: Request):
+    user = await get_user(request, user_id, session)
+
+    user_json = user_data.model_dump(exclude_unset=True)
+
+    for field, value in user_json.items():
+        setattr(user, field, value)
+
+    await  add_item(session, user)
+    session.commit()
+
+    return user.id_dict
+
+@app.delete("/api/v1/user/{user_id}")
+async def delete_user(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
+    user = await get_user(request, user_id, session)
+
+    if not request.user.is_superuser:
+        raise HTTPException(status_code=403, detail="You are not authorized to delete this user")
+
+    session.delete(user)
+    await session.commit()
+    return {"detail": "User deleted successfully"}
+
+
+@app.get('/api/v1/user/{user_id}', response_model=GetUserResponse)
+async def read_user(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
+    user = await get_user(request, user_id, session)
+    return user.dict_
+
+@app.get('/api/v1/user/{user_id}/audio-files', response_model=list[GetAudioFileResponse])
+async def list_audio_files(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
+    user = await get_user(request, user_id, session)
+
+    audio_files = session.query(AudioFile).filter(AudioFile.user.id == user.id)
+
+    if not audio_files:
+        raise HTTPException(status_code=404, detail="No audio files found")
+
+    return [file.dict_ for file in audio_files]

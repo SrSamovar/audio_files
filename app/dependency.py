@@ -1,12 +1,13 @@
-import os
 from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import Session
+
+from app.auth import SECRET_KEY, ALGORITHM
+from models import Session
 
 
 async def get_session() -> AsyncSession:
-    with Session() as session:
+    async with Session() as session:
         yield session
 
 

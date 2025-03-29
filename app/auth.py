@@ -1,6 +1,16 @@
+import os
 from datetime import timedelta, datetime
 from jose import jwt, JWTError
-from app.server import SECRET_KEY, ALGORITHM
+
+
+SECRET_KEY = os.getenv('SECRET_KEY')
+ALGORITHM = os.getenv('ALGORITHM')
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+YANDEX_CLIENT_ID = os.getenv('YANDEX_CLIENT_ID')
+YANDEX_CLIENT_SECRET = os.getenv('YANDEX_CLIENT_SECRET')
+YANDEX_REDIRECT_URI = "http://localhost:8000/auth/yandex/callback"
+YANDEX_OAUTH_URL = "https://oauth.yandex.ru/authorize"
+YANDEX_TOKEN_URL = "https://oauth.yandex.ru/token"
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
