@@ -51,3 +51,12 @@ class AudioFile(Base):
     filename: Mapped[str] = mapped_column(String, unique=True)
     file_path: Mapped[str] = mapped_column(String)
     user: Mapped[User] = relationship(User, lazy='joined', back_populates='audios')
+
+async def init_orm():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+async def close_orm():
+    await engine.dispose()
+
