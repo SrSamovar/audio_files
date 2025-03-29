@@ -1,8 +1,10 @@
 from datetime import timedelta
+from typing import Annotated
+
 import requests
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.responses import RedirectResponse
-from crud import create_access_token
+from auth import verify_token, create_access_token
 from lifespan import lifespan
 from dependency import SessionDependency
 from models import User
@@ -76,3 +78,39 @@ async def auth_yandex_callback(code: str, session: SessionDependency):
     jwt_token = create_access_token(data={"sub": user.yandex_id}, expires_delta=access_token_expires)
 
     return {"access_token": jwt_token, "token_type": "bearer"}
+
+
+@app.post("/upload-audio/")
+async def upload_audio(
+        session: SessionDependency,
+        file: Annotated[UploadFile, File()],
+        filename: str = None
+):
+    token = file.headers.get("Authorization")
+    if not token or not token.startswith("Bearer "):
+        raise HTTPException(status_code=403, detail="Not authenticated")
+
+    token = token.split(" ")[1]
+    user_id = verify_token(token)
+
+    if not user_id:
+        raise HTTPException(status_code=403, detail="Invalid token")
+
+    user = session.query(User).filter(User.yandex_id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if filename is None:
+        filename = file.filename
+
+    file_location = f"audio_files/{filename}"
+
+    if os.path.exists(file_location):
+        raise HTTPException(status_code=400, detail="File already exists")
+
+    with open(file_location, "wb") as audio_file:
+        audio_file.write(await file.read())
+
+    return {"info": f"File '{filename}' uploaded successfully"}
+
