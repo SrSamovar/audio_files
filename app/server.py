@@ -128,7 +128,7 @@ async def update_user(session: SessionDependency, user_id: int,
     return user.id_dict
 
 @app.delete("/api/v1/user/{user_id}", tags=['User'])
-async def delete_user(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
+async def delete_user(session: SessionDependency, user_id: int, request: Request):
     user = await get_user(request, user_id, session)
 
     if not request.user.is_superuser:
@@ -140,13 +140,13 @@ async def delete_user(session: SessionDependency, user_id: Annotated[int, Form()
 
 
 @app.get('/api/v1/user/{user_id}', response_model=GetUserResponse, tags=['User'])
-async def read_user(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
+async def read_user(session: SessionDependency, user_id: int, request: Request):
     user = await get_user(request, user_id, session)
     return user.dict_
 
 @app.get('/api/v1/user/{user_id}/audio-files',
          response_model=list[GetAudioFileResponse], tags=['Audiofiles'])
-async def list_audio_files(session: SessionDependency, user_id: Annotated[int, Form()], request: Request):
+async def list_audio_files(session: SessionDependency, user_id: int, request: Request):
     user = await get_user(request, user_id, session)
 
     audio_files = session.query(AudioFile).filter(AudioFile.user.id == user.id)
